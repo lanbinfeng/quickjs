@@ -5,7 +5,7 @@ test: install
 install: build
 	poetry run python setup.py develop
 
-build: Makefile module.c upstream-quickjs/quickjs.c upstream-quickjs/quickjs.h
+build: Makefile module.c cquickjs/quickjs.c cquickjs/quickjs.h
 ifeq ($(shell uname | head -c5), MINGW)
 	poetry run python setup.py build -c mingw32
 else

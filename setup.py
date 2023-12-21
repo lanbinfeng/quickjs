@@ -4,7 +4,7 @@ from typing import List
 
 from setuptools import setup, Extension
 
-CONFIG_VERSION = open("upstream-quickjs/VERSION").read().strip()
+CONFIG_VERSION = open("cquickjs/VERSION").read().strip()
 extra_link_args: List[str] = []
 
 if sys.platform == "win32":
@@ -25,29 +25,29 @@ if sys.platform == "win32":
 def get_c_sources(include_headers=False):
     sources = [
         "module.c",
-        "upstream-quickjs/cutils.c",
-        "upstream-quickjs/libbf.c",
-        "upstream-quickjs/libregexp.c",
-        "upstream-quickjs/libunicode.c",
-        "upstream-quickjs/quickjs.c",
-        "upstream-quickjs/quickjs-debugger.c",
-        "upstream-quickjs/quickjs-debugger-transport-unix.c",
+        "cquickjs/cutils.c",
+        "cquickjs/libbf.c",
+        "cquickjs/libregexp.c",
+        "cquickjs/libunicode.c",
+        "cquickjs/quickjs.c",
+        "cquickjs/quickjs-debugger.c",
+        "cquickjs/quickjs-debugger-transport-unix.c",
     ]
     if include_headers:
         sources += [
-            "upstream-quickjs/cutils.h",
-            "upstream-quickjs/libbf.h",
-            "upstream-quickjs/libregexp-opcode.h",
-            "upstream-quickjs/libregexp.h",
-            "upstream-quickjs/libunicode-table.h",
-            "upstream-quickjs/libunicode.h",
-            "upstream-quickjs/list.h",
-            "upstream-quickjs/quickjs-atom.h",
-            "upstream-quickjs/quickjs-opcode.h",
-            "upstream-quickjs/quickjs.h",
-            "upstream-quickjs/config.h",
-            "upstream-quickjs/quickjs-debugger.h",
-            "upstream-quickjs/VERSION",
+            "cquickjs/cutils.h",
+            "cquickjs/libbf.h",
+            "cquickjs/libregexp-opcode.h",
+            "cquickjs/libregexp.h",
+            "cquickjs/libunicode-table.h",
+            "cquickjs/libunicode.h",
+            "cquickjs/list.h",
+            "cquickjs/quickjs-atom.h",
+            "cquickjs/quickjs-opcode.h",
+            "cquickjs/quickjs.h",
+            "cquickjs/config.h",
+            "cquickjs/quickjs-debugger.h",
+            "cquickjs/VERSION",
         ]
     return sources
 
