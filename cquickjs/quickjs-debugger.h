@@ -15,6 +15,7 @@ typedef struct JSDebuggerFunctionInfo {
     uint32_t dirty;
     int last_line_num;
 } JSDebuggerFunctionInfo;
+extern  JSDebuggerFunctionInfo *g_js_file_list;
 
 typedef struct JSDebuggerLocation {
     JSAtom filename;
@@ -60,8 +61,6 @@ typedef struct JSDebuggerInfo {
     int stepping;
     JSDebuggerLocation step_over;
     int step_depth;
-
-    JSDebuggerJSFileInfo *js_file_list;
 } JSDebuggerInfo;
 
 void js_debugger_new_context(JSContext *ctx);
@@ -107,7 +106,7 @@ JSValue js_debugger_closure_variables(JSContext *ctx, int stack_index);
 // evaluates an expression at any stack frame. JS_Evaluate* only evaluates at the top frame.
 JSValue js_debugger_evaluate(JSContext *ctx, int stack_index, JSValue expression);
 
-void js_debugger_clear_js_file_list(JSDebuggerInfo *info);
+void js_debugger_clear_js_file_list(JSRuntime *rt, JSDebuggerInfo *info);
 
 // end internal api functions
 

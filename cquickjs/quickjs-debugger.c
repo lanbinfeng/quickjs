@@ -3,6 +3,9 @@
 #include <string.h>
 #include <assert.h>
 
+JSDebuggerFunctionInfo *g_js_file_list = NULL;
+
+
 typedef struct DebuggerSuspendedState {
     uint32_t variable_reference_count;
     JSValue variable_references;
@@ -206,13 +209,16 @@ static void js_send_stopped_event(JSDebuggerInfo *info, const char *reason) {
     if (strcmp("entry", reason) == 0) {
 
         JSValue files = JS_NewObject(ctx);
-        JSDebuggerJSFileInfo *item = info->js_file_list;
+        JSDebuggerJSFileInfo *item = g_js_file_list;
+        int index = 0;
         while (item != NULL)
         {
             JS_SetPropertyStr(ctx, files, item->filename, JS_NewString(ctx, item->content));
+            printf("files:%d.[%s]", index, item->filename);
+            ++index;
             item = item ->next;
         }
-        JS_SetPropertyStr(ctx, event, "files", JS_NewString(ctx, reason));
+        JS_SetPropertyStr(ctx, event, "files", files);
     }
 
     js_transport_send_event(info, event);
@@ -544,13 +550,9 @@ static void js_debugger_context_event(JSContext *caller_ctx, const char *reason)
 
 void js_debugger_new_context(JSContext *ctx) {
     js_debugger_context_event(ctx, "new");
-    JSDebuggerInfo *info = js_debugger_info(JS_GetRuntime(ctx));
-    info->js_file_list = NULL;
 }
 
 void js_debugger_free_context(JSContext *ctx) {
-    JSDebuggerInfo *info = js_debugger_info(JS_GetRuntime(ctx));
-    js_debugger_clear_js_file_list(JS_GetRuntime(ctx), info);
     js_debugger_context_event(ctx, "exited");
 }
 
@@ -698,24 +700,20 @@ void js_debugger_add_new_file(JSContext *ctx, char *filename, char *input, int l
     int name_len = strlen(filename) + 1;
     int size =  sizeof(JSDebuggerJSFileInfo) + name_len + len + 1;
     JSDebuggerJSFileInfo* file = js_mallocz_rt(JS_GetRuntime(ctx), size);
-     = ((char*)file) + sizeof(JSDebuggerJSFileInfo);
+    file->filename = ((char*)file) + sizeof(JSDebuggerJSFileInfo);
     memcpy(file->filename, filename, name_len);
 
     file->content = ((char*)file) + sizeof(JSDebuggerJSFileInfo) + name_len + 1;
     memcpy(file->content, input, len);
 
-
-    JSDebuggerInfo *info = js_debugger_info(JS_GetRuntime(ctx));
-
-    file->next = info->js_file_list;
-    info->js_file_list = file;
+    file->next = g_js_file_list;
+    g_js_file_list = file;
 }
 
 void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info) {
     if (!info->transport_close)
         return;
 
-    js_debugger_clear_js_file_list(rt, info);
     // don't use the JSContext because it might be in a funky state during teardown.
     const char* terminated = "{\"type\":\"event\",\"event\":{\"type\":\"terminated\"}}";
     js_transport_write_message_newline(info, terminated, strlen(terminated));
@@ -781,20 +779,15 @@ void js_debugger_cooperate(JSContext *ctx) {
 
 void js_debugger_clear_js_file_list(JSRuntime *rt, JSDebuggerInfo *info)
 {
-    if (info->js_file_list == NULL)
+    if (g_js_file_list == NULL)
         return;
 
-    JSDebuggerJSFileInfo *item = info->js_file_list;
+    JSDebuggerJSFileInfo *item = g_js_file_list;
     while (item != NULL)
     {
         JSDebuggerJSFileInfo *next = item ->next;
         js_free_rt(rt, (void*)item);
         item = next;
     }
-    info->js_file_list = NULL;
-}
-
-JSValue js_debugger_send_js_file_list(JSContext *ctx)
-{
-
+    g_js_file_list = NULL;
 }
