@@ -30,6 +30,8 @@ def get_c_sources(include_headers=False):
         "upstream-quickjs/libregexp.c",
         "upstream-quickjs/libunicode.c",
         "upstream-quickjs/quickjs.c",
+        "upstream-quickjs/quickjs-debugger.c",
+        "upstream-quickjs/quickjs-debugger-transport-unix.c",
     ]
     if include_headers:
         sources += [
@@ -43,6 +45,8 @@ def get_c_sources(include_headers=False):
             "upstream-quickjs/quickjs-atom.h",
             "upstream-quickjs/quickjs-opcode.h",
             "upstream-quickjs/quickjs.h",
+            "upstream-quickjs/config.h",
+            "upstream-quickjs/quickjs-debugger.h",
             "upstream-quickjs/VERSION",
         ]
     return sources

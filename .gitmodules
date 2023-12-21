@@ -1,3 +1,0 @@
-[submodule "upstream-quickjs"]
-	path = upstream-quickjs
-	url = https://github.com/bellard/quickjs.git
