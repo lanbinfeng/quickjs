@@ -33636,6 +33636,8 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     JSFunctionDef *fd;
     JSModuleDef *m;
 
+    js_debugger_add_new_file(ctx, filename, input, input_len);
+
     js_parse_init(ctx, s, input, input_len, filename);
     skip_shebang(s);
 
