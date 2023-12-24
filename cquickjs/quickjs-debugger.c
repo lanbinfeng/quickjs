@@ -89,7 +89,7 @@ static int js_transport_send_response(JSDebuggerInfo *info, JSValue request, JSV
 static int js_transport_send_files(JSDebuggerInfo *info) {
     JSContext *ctx = info->ctx;
     JSValue envelope = js_transport_new_envelope(info, "files");
-    JSDebuggerJSFileInfo *item = g_js_file_list;
+
     JSValue files = JS_NewObject(ctx);
     JSDebuggerJSFileInfo *item = g_js_file_list;
     int index = 0;
