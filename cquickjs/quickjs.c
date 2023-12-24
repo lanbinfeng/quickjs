@@ -33636,6 +33636,15 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     JSFunctionDef *fd;
     JSModuleDef *m;
 
+    static int file_version = 1;
+    if (strcmp(filename, "<input>") == 0)
+    {
+        char namebuffer[32];
+        sprintf(namebuffer, "eval_%d.js", file_version);
+        printf("js_filename:%s", namebuffer);
+        filename = namebuffer;
+        ++file_version;
+    }
     js_debugger_add_new_file(ctx, filename, input, input_len);
 
     js_parse_init(ctx, s, input, input_len, filename);

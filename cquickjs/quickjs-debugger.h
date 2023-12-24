@@ -15,7 +15,6 @@ typedef struct JSDebuggerFunctionInfo {
     uint32_t dirty;
     int last_line_num;
 } JSDebuggerFunctionInfo;
-extern  JSDebuggerFunctionInfo *g_js_file_list;
 
 typedef struct JSDebuggerLocation {
     JSAtom filename;
@@ -30,10 +29,15 @@ typedef struct JSDebuggerLocation {
 
 typedef struct JSDebuggerJSFileInfo {
     char *filename;
+    int name_len;
+
     char *content;
-    int len;
+    int content_len;
+
+    int version;
     struct JSDebuggerJSFileInfo *next;
 } JSDebuggerJSFileInfo;
+extern  JSDebuggerJSFileInfo *g_js_file_list;
 
 typedef struct JSDebuggerInfo {
     // JSContext that is used to for the JSON transport and debugger state.
@@ -61,6 +65,8 @@ typedef struct JSDebuggerInfo {
     int stepping;
     JSDebuggerLocation step_over;
     int step_depth;
+
+    int file_send_ver;
 } JSDebuggerInfo;
 
 void js_debugger_new_context(JSContext *ctx);
@@ -68,7 +74,7 @@ void js_debugger_free_context(JSContext *ctx);
 void js_debugger_check(JSContext *ctx, const uint8_t *pc);
 void js_debugger_exception(JSContext* ctx);
 void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info);
-void js_debugger_add_new_file(JSContext *ctx, char *filename, char *input, int len);
+void js_debugger_add_new_file(JSContext *ctx, const char *filename, const char *input, int len);
 
 void js_debugger_attach(
     JSContext* ctx,
@@ -105,9 +111,6 @@ JSValue js_debugger_closure_variables(JSContext *ctx, int stack_index);
 
 // evaluates an expression at any stack frame. JS_Evaluate* only evaluates at the top frame.
 JSValue js_debugger_evaluate(JSContext *ctx, int stack_index, JSValue expression);
-
-void js_debugger_clear_js_file_list(JSRuntime *rt);
-void js_debugger_send_file_list(JSRuntime *rt);
 
 // end internal api functions
 

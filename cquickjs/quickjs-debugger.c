@@ -3,8 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-JSDebuggerFunctionInfo *g_js_file_list = NULL;
-
+JSDebuggerJSFileInfo *g_js_file_list = NULL;
 
 typedef struct DebuggerSuspendedState {
     uint32_t variable_reference_count;
@@ -87,20 +86,34 @@ static int js_transport_send_response(JSDebuggerInfo *info, JSValue request, JSV
 }
 
 static int js_transport_send_files(JSDebuggerInfo *info) {
-    JSContext *ctx = info->ctx;
-    JSValue envelope = js_transport_new_envelope(info, "files");
-
-    JSValue files = JS_NewObject(ctx);
     JSDebuggerJSFileInfo *item = g_js_file_list;
+    if (info->file_send_ver > 0 && item->version <= info->file_send_ver)
+        return;
+    
+    const char *name = "files";
+    if (info->file_send_ver != 0)
+        name = "add_files";
+    JSValue envelope = js_transport_new_envelope(info, name);
+
+    JSContext *ctx = info->ctx;
+    JSValue files = JS_NewObject(ctx);
     int index = 0;
+    int max_version = info->file_send_ver;
     while (item != NULL)
     {
-        JS_SetPropertyStr(ctx, files, item->filename, JS_NewString(ctx, item->content));
-        printf("files:%d.[%s]", index, item->filename);
-        ++index;
-        item = item ->next;
+        if (item->version > info->file_send_ver)
+        {
+            if (max_version < item->version)
+                max_version = item->version;
+
+            JS_SetPropertyStr(ctx, files, item->filename, JS_NewString(ctx, item->content));
+            printf("files:%d.[%s]", index, item->filename);
+            ++index;
+            item = item ->next;
+        }
     }
     JS_SetPropertyStr(ctx, envelope, "files", files);
+    info->file_send_ver = max_version;
     return js_transport_write_value(info, envelope);
 }
 
@@ -585,6 +598,8 @@ void js_debugger_check(JSContext* ctx, const uint8_t *cur_pc) {
     if (info->transport_close == NULL)
         goto done;
 
+    js_transport_send_files(info);
+
     struct JSDebuggerLocation location;
     int depth;
 
@@ -697,19 +712,36 @@ void js_debugger_check(JSContext* ctx, const uint8_t *cur_pc) {
         info->ctx = NULL;
 }
 
-void js_debugger_add_new_file(JSContext *ctx, char *filename, char *input, int len)
+void js_debugger_add_new_file(JSContext *ctx, const char *filename, const char *input, int len)
 {
+    static int current_version = 1;
+
     int name_len = strlen(filename) + 1;
     int size =  sizeof(JSDebuggerJSFileInfo) + name_len + len + 1;
     JSDebuggerJSFileInfo* file = js_mallocz_rt(JS_GetRuntime(ctx), size);
     file->filename = ((char*)file) + sizeof(JSDebuggerJSFileInfo);
     memcpy(file->filename, filename, name_len);
+    file->name_len = name_len;
 
     file->content = ((char*)file) + sizeof(JSDebuggerJSFileInfo) + name_len + 1;
     memcpy(file->content, input, len);
+    file->content_len = len;
 
+    file->version = current_version++;
+    
     file->next = g_js_file_list;
     g_js_file_list = file;
+
+    if (ctx == NULL) return;
+    JSRuntime *rt = JS_GetRuntime(ctx);
+    if (rt == NULL) return;
+
+    if (js_debugger_is_transport_connected(rt))
+    {
+        JSDebuggerInfo *info = js_debugger_info(rt);
+        if (info == NULL) return;
+        //js_transport_send_files(info);
+    }
 }
 
 void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info) {
@@ -761,6 +793,7 @@ void js_debugger_attach(
     JSContext *original_ctx = info->ctx;
     info->ctx = ctx;
 
+    info->file_send_ver = 0;
     js_transport_send_files(info);
     js_send_stopped_event(info, "entry");
 
