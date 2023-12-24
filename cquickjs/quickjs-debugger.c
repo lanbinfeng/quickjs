@@ -86,6 +86,24 @@ static int js_transport_send_response(JSDebuggerInfo *info, JSValue request, JSV
     return js_transport_write_value(info, envelope);
 }
 
+static int js_transport_send_files(JSDebuggerInfo *info) {
+    JSContext *ctx = info->ctx;
+    JSValue envelope = js_transport_new_envelope(info, "files");
+    JSDebuggerJSFileInfo *item = g_js_file_list;
+    JSValue files = JS_NewObject(ctx);
+    JSDebuggerJSFileInfo *item = g_js_file_list;
+    int index = 0;
+    while (item != NULL)
+    {
+        JS_SetPropertyStr(ctx, files, item->filename, JS_NewString(ctx, item->content));
+        printf("files:%d.[%s]", index, item->filename);
+        ++index;
+        item = item ->next;
+    }
+    JS_SetPropertyStr(ctx, envelope, "files", files);
+    return js_transport_write_value(info, envelope);
+}
+
 static JSValue js_get_scopes(JSContext *ctx, int frame) {
     // for now this is always the same.
     // global, local, closure. may change in the future. can check if closure is empty.
@@ -205,22 +223,6 @@ static void js_send_stopped_event(JSDebuggerInfo *info, const char *reason) {
     JS_SetPropertyStr(ctx, event, "reason", JS_NewString(ctx, reason));
     int64_t id = (int64_t)info->ctx;
     JS_SetPropertyStr(ctx, event, "thread", JS_NewInt64(ctx, id));
-
-    if (strcmp("entry", reason) == 0) {
-
-        JSValue files = JS_NewObject(ctx);
-        JSDebuggerJSFileInfo *item = g_js_file_list;
-        int index = 0;
-        while (item != NULL)
-        {
-            JS_SetPropertyStr(ctx, files, item->filename, JS_NewString(ctx, item->content));
-            printf("files:%d.[%s]", index, item->filename);
-            ++index;
-            item = item ->next;
-        }
-        JS_SetPropertyStr(ctx, event, "files", files);
-    }
-
     js_transport_send_event(info, event);
 }
 
@@ -759,6 +761,7 @@ void js_debugger_attach(
     JSContext *original_ctx = info->ctx;
     info->ctx = ctx;
 
+    js_transport_send_files(info);
     js_send_stopped_event(info, "entry");
 
     info->breakpoints = JS_NewObject(info->debugging_ctx);
@@ -777,7 +780,7 @@ void js_debugger_cooperate(JSContext *ctx) {
     js_debugger_info(JS_GetRuntime(ctx))->should_peek = 1;
 }
 
-void js_debugger_clear_js_file_list(JSRuntime *rt, JSDebuggerInfo *info)
+void js_debugger_clear_js_file_list(JSRuntime *rt)
 {
     if (g_js_file_list == NULL)
         return;
