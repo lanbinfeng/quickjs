@@ -64,6 +64,10 @@ class Function:
     def add_callable(self, global_name: str, callable: Callable) -> None:
         with self._lock:
             self._context.add_callable(global_name, callable)
+    
+    def debugger_wait(self, addr: str) -> None:
+        with self._lock:
+            self._context.debugger_wait(addr)
 
     def gc(self):
         """Manually run the garbage collection.

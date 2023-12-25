@@ -19,7 +19,8 @@ if sys.platform == "win32":
     distutils.cygwinccompiler.get_msvcr = lambda: [] 
     # Make sure that pthreads is linked statically, otherwise we run into problems
     # on computers where it is not installed.
-    extra_link_args = ["-static"]
+    extra_link_args = ['-static']
+    extra_library_args=['ws2_32']
 
 
 def get_c_sources(include_headers=False):
@@ -30,9 +31,13 @@ def get_c_sources(include_headers=False):
         "cquickjs/libregexp.c",
         "cquickjs/libunicode.c",
         "cquickjs/quickjs.c",
-        "cquickjs/quickjs-debugger.c",
-        "cquickjs/quickjs-debugger-transport-unix.c",
+        "cquickjs/quickjs-debugger.c"
     ]
+    if sys.platform == "win32":
+        sources.append("cquickjs/quickjs-debugger-transport-win.c")
+    else :
+        sources.append("cquickjs/quickjs-debugger-transport-unix.c")
+
     if include_headers:
         sources += [
             "cquickjs/cutils.h",
@@ -58,7 +63,8 @@ _quickjs = Extension(
     # HACK.
     # See https://github.com/pypa/packaging-problems/issues/84.
     sources=get_c_sources(include_headers=("sdist" in sys.argv)),
-    extra_compile_args=["-Werror=incompatible-pointer-types"],
+    extra_compile_args=[],
+	libraries=extra_library_args,
     extra_link_args=extra_link_args)
 
 long_description = """

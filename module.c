@@ -793,7 +793,7 @@ static PyMethodDef runtime_methods[] = {
     {"memory", (PyCFunction)runtime_memory, METH_NOARGS, "Returns the memory usage as a dict."},
     {"gc", (PyCFunction)runtime_gc, METH_NOARGS, "Runs garbage collection."},
     {"add_callable", (PyCFunction)runtime_add_callable, METH_VARARGS, "Wraps a Python callable."},
-    {"debugger_wait", (PyCFunction)runtime_debugger_wait, METH_VARARGS, "Wraps a Python callable."},
+    {"debugger_wait", (PyCFunction)runtime_debugger_wait, METH_VARARGS, "wait debugger."},
     {NULL} /* Sentinel */
 };
 
