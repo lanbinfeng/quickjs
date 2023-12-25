@@ -131,42 +131,79 @@ void js_debugger_connect(JSContext *ctx, const char *address) {
 
 
 void js_debugger_wait_connection(JSContext *ctx, const char* address) {
-	WSADATA wsaData;
-	WSAStartup(MAKEWORD(2, 2), &wsaData);
+	// 初始化 Winsock 库
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        printf("Failed to initialize Winsock\n");
+        return;
+    }
 
-    char* port_string = strstr(address, ":");
-    assert(port_string);
+    // 拆分地址字符串
+    char* ipAddress = _strdup(address);
+    unsigned short port;
 
-    int port = atoi(port_string + 1);
-    assert(port);
+    char* colonPos = strchr(ipAddress, ':');
+    if (colonPos != NULL) {
+        *colonPos = '\0';
+        ++colonPos;
 
-    char host_string[256];
-    strcpy(host_string, address);
-    host_string[port_string - address] = 0;
+        // 提取端口号
+        port = atoi(colonPos);
+    } else {
+        printf("Invalid address format!\n");
+        free(ipAddress);
+        WSACleanup();
+        return;
+    }
 
-    struct hostent *host = gethostbyname(host_string);
-    assert(host);
-    struct sockaddr_in addr;
+    // 创建监听套接字，使用 IPv4 和 TCP 协议
+    SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listenSocket == INVALID_SOCKET) {
+        printf("Failed to create listen socket: %d\n", WSAGetLastError());
+        free(ipAddress);
+        WSACleanup();
+        return;
+    }
 
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    memcpy((char *)&addr.sin_addr.s_addr, (char *)host->h_addr, host->h_length);
-    addr.sin_port = htons(port);
+    // 设置服务器地址结构
+    struct sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(port);
+    serverAddr.sin_addr.s_addr = inet_addr(ipAddress);
 
-    int server = socket(AF_INET, SOCK_STREAM, 0);
-    assert(server > 0);
+    // 绑定监听套接字到指定地址和端口
+    if (bind(listenSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        printf("Failed to bind the listen socket: %d\n", WSAGetLastError());
+        closesocket(listenSocket);
+        free(ipAddress);
+        WSACleanup();
+        return;
+    }
 
-    int ret = bind(server, (struct sockaddr*)&addr, sizeof(addr));
-    assert(ret > 0);
-
-    listen(server, 1);
+    // 开始监听连接
+    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+        printf("Failed to listen for connections: %d\n", WSAGetLastError());
+        closesocket(listenSocket);
+        free(ipAddress);
+        WSACleanup();
+        return;
+    }
 
     struct sockaddr_in clientAddr;
     int clientAddrLen = sizeof(clientAddr);
-    int client = accept(server, (struct sockaddr*)&clientAddr, &clientAddrLen);
-    assert(client > 0);
+    SOCKET clientSocket = accept(listenSocket, (struct sockaddr*)&clientAddr, &clientAddrLen);
+    if (clientSocket == INVALID_SOCKET) 
+    {
+        printf("Failed to accept for connections: %d\n", WSAGetLastError());
+        closesocket(listenSocket);
+        free(ipAddress);
+        WSACleanup();
+        return;
+    }
+    // 释放内存
+    free(ipAddress);
 	    
     struct js_transport_data *data = (struct js_transport_data *)malloc(sizeof(struct js_transport_data));
-    data->handle = client;
+    data->handle = clientSocket;
     js_debugger_attach(ctx, js_transport_read, js_transport_write, js_transport_peek, js_transport_close, data);
 }
