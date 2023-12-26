@@ -1,0 +1,4 @@
+1、 pip install quickjs-1.19.4-cp38-cp38-win_amd64.whl
+2、进入test目录，执行 python test.py
+3、把koush.quickjs-debug-0.0.15.rar解压到vscode插件目录，C:\Users\用户\.vscode\extensions
+4、vscode打开test，切换到调试，点击连接

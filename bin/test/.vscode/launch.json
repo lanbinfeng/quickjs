@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "quickjs",
+            "request": "attach",
+            "name": "Connect QuickJS",
+            "localRoot": "${workspaceFolder}/",
+            "port": 9999,
+            "address": "127.0.0.1",
+            "mode": "connect"
+        }
+    ]
+  }
+
