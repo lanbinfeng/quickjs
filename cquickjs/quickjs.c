@@ -309,6 +309,7 @@ struct JSRuntime {
     void *user_opaque;
 
     JSDebuggerInfo debugger_info;
+    char wait_addr[64];
 };
 
 struct JSClass {
@@ -1661,6 +1662,11 @@ JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque)
     JS_UpdateStackTop(rt);
 
     rt->current_exception = JS_NULL;
+    rt->wait_addr[0] = 0;
+
+    char *address = getenv("QUICKJS_DEBUG_LISTEN_ADDRESS");
+    if (address != NULL)
+        js_set_wait_addr(rt, address);
 
     return rt;
  fail:
@@ -1931,7 +1937,7 @@ void JS_SetRuntimeInfo(JSRuntime *rt, const char *s)
 
 void JS_FreeRuntime(JSRuntime *rt)
 {
-    js_debugger_free(rt, &rt->debugger_info);
+    js_debugger_free(rt, &rt->debugger_info, 1);
 
     struct list_head *el, *el1;
     int i;
@@ -33641,7 +33647,7 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     {
         char namebuffer[32];
         sprintf(namebuffer, "eval_%d.js", file_version);
-        printf("js_filename:%s", namebuffer);
+        printf("__JS_EvalInternal | js_filename:%s\n", namebuffer);
         filename = namebuffer;
         ++file_version;
     }
@@ -54120,6 +54126,21 @@ JSDebuggerLocation js_debugger_current_location(JSContext *ctx, const uint8_t *c
 
 JSDebuggerInfo *js_debugger_info(JSRuntime *rt) {
     return &rt->debugger_info;
+}
+
+const char *js_wait_addr(JSRuntime *rt) {
+    return rt->wait_addr;
+}
+void js_set_wait_addr(JSRuntime *rt, const char *addr) {
+
+    int len = strlen(addr);
+	if (len > sizeof(rt->wait_addr))
+		len = sizeof(rt->wait_addr) - 1;
+	if (len > 0)
+	{
+		memcpy(rt->wait_addr, addr, len);
+		rt->wait_addr[len] = 0;
+	}
 }
 
 uint32_t js_debugger_stack_depth(JSContext *ctx) {

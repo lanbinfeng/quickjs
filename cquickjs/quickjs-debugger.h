@@ -44,9 +44,6 @@ typedef struct JSDebuggerInfo {
     JSContext *ctx;
     JSContext *debugging_ctx;
  
-    int attempted_connect;
-    int attempted_wait;
-    int peek_ticks;
     int should_peek;
     char *message_buffer;
     int message_buffer_length;
@@ -73,7 +70,7 @@ void js_debugger_new_context(JSContext *ctx);
 void js_debugger_free_context(JSContext *ctx);
 void js_debugger_check(JSContext *ctx, const uint8_t *pc);
 void js_debugger_exception(JSContext* ctx);
-void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info);
+void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info, int send_close_msg);
 void js_debugger_add_new_file(JSContext *ctx, const char *filename, const char *input, int len);
 
 void js_debugger_attach(
@@ -95,6 +92,7 @@ void js_debugger_cooperate(JSContext *ctx);
 // these functions all require access to quickjs internal structures.
 
 JSDebuggerInfo *js_debugger_info(JSRuntime *rt);
+const char *js_wait_addr(JSRuntime *rt);
 
 // this may be able to be done with an Error backtrace,
 // but would be clunky and require stack string parsing.

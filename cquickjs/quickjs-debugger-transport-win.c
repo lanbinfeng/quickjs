@@ -14,7 +14,7 @@ struct js_transport_data {
 
 static size_t js_transport_read(void *udata, char *buffer, size_t length) {
     struct js_transport_data* data = (struct js_transport_data *)udata;
-    if (data->handle <= 0)
+    if (data == NULL || data->handle <= 0)
         return -1;
 
     if (length == 0)
@@ -40,7 +40,7 @@ static size_t js_transport_read(void *udata, char *buffer, size_t length) {
 
 static size_t js_transport_write(void *udata, const char *buffer, size_t length) {
     struct js_transport_data* data = (struct js_transport_data *)udata;
-    if (data->handle <= 0)
+    if (data == NULL || data->handle <= 0)
         return -1;
 
     if (length == 0)
@@ -59,24 +59,28 @@ static size_t js_transport_write(void *udata, const char *buffer, size_t length)
 }
 
 static size_t js_transport_peek(void *udata) {
-    WSAPOLLFD  fds[1];
-    int poll_rc;
 
     struct js_transport_data* data = (struct js_transport_data *)udata;
-    if (data->handle <= 0)
+    if (data == NULL || data->handle <= 0)
         return -1;
 
-    fds[0].fd = data->handle;
-    fds[0].events = POLLIN;
-    fds[0].revents = 0;
+    fd_set readSet;
+    FD_ZERO(&readSet);
+    FD_SET(data->handle, &readSet);
 
-    poll_rc = WSAPoll(fds, 1, 0);
-    if (poll_rc < 0)
+    struct timeval timeout;
+    timeout.tv_sec = 0;    // 超时时间设置为1秒
+    timeout.tv_usec = 0;
+    // 调用 select() 函数来检测可读性和断开
+    int result = select(1, &readSet, NULL, NULL, &timeout);
+    //printf("select fd=%d, ret=%d\n",data->handle, result);
+
+    if (result < 0) {
+        printf("Select error.\n");
         return -2;
-    if (poll_rc > 1)
-        return -3;
+    }
     // no data
-    if (poll_rc == 0)
+    if (result == 0)
         return 0;
     // has data
     return 1;
@@ -84,7 +88,7 @@ static size_t js_transport_peek(void *udata) {
 
 static void js_transport_close(JSContext* ctx, void *udata) {
     struct js_transport_data* data = (struct js_transport_data *)udata;
-    if (data->handle <= 0)
+    if (data == NULL || data->handle <= 0)
         return;
 
     close(data->handle);
@@ -96,6 +100,7 @@ static void js_transport_close(JSContext* ctx, void *udata) {
 }
 
 void js_debugger_connect(JSContext *ctx, const char *address) {
+    printf("js_debugger_connect address = %s\n", address);
 
 	WSADATA wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -131,6 +136,8 @@ void js_debugger_connect(JSContext *ctx, const char *address) {
 
 
 void js_debugger_wait_connection(JSContext *ctx, const char* address) {
+    printf("js_debugger_wait_connection address = %s\n", address);
+
 	// 初始化 Winsock 库
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -202,7 +209,8 @@ void js_debugger_wait_connection(JSContext *ctx, const char* address) {
     }
     // 释放内存
     free(ipAddress);
-	    
+	closesocket(listenSocket);
+
     struct js_transport_data *data = (struct js_transport_data *)malloc(sizeof(struct js_transport_data));
     data->handle = clientSocket;
     js_debugger_attach(ctx, js_transport_read, js_transport_write, js_transport_peek, js_transport_close, data);

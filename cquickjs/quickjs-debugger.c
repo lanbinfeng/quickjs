@@ -17,7 +17,15 @@ static int js_transport_read_fully(JSDebuggerInfo *info, char *buffer, size_t le
     while (offset < length) {
         int received = info->transport_read(info->transport_udata, buffer + offset, length - offset);
         if (received <= 0)
+        {
+            printf("received <= 0 disconnect\n");
+            js_debugger_free(JS_GetRuntime(info->ctx), info, 0);
             return 0;
+        }
+        else
+        {
+            printf("received = %d\n", received);
+        }
         offset += received;
     }
 
@@ -26,10 +34,19 @@ static int js_transport_read_fully(JSDebuggerInfo *info, char *buffer, size_t le
 
 static int js_transport_write_fully(JSDebuggerInfo *info, const char *buffer, size_t length) {
     int offset = 0;
-    while (offset < length) {
+    while (offset < length)
+    {
         int sent = info->transport_write(info->transport_udata, buffer + offset, length - offset);
         if (sent <= 0)
+        {
+            printf("sent <= 0\n");
+            js_debugger_free(JS_GetRuntime(info->ctx), info, 0);
             return 0;
+        }
+        else
+        {
+            printf("sent = %d\n", sent);
+        }
         offset += sent;
     }
 
@@ -43,12 +60,24 @@ static int js_transport_write_message_newline(JSDebuggerInfo *info, const char* 
     message_length[9] = '\0';
     sprintf(message_length, "%08x\n", (int)len + 1);
     if (!js_transport_write_fully(info, message_length, 9))
+    {
+        printf("js_transport_write_message_newline 1 ret == 0， %s\n", message_length);
         return 0;
+    }
     int ret = js_transport_write_fully(info, value, len);
     if (!ret)
-        return ret;
+    {
+        printf("js_transport_write_message_newline 2 ret == 0， %s\n", value);
+        return 0;
+    }
     char newline[2] = { '\n', '\0' };
-    return js_transport_write_fully(info, newline, 1);
+    ret =  js_transport_write_fully(info, newline, 1);
+    if (!ret)
+    {
+        printf("js_transport_write_message_newline 2 ret == 0， %s\n", newline);
+    }
+    return ret;
+
 }
 
 static int js_transport_write_value(JSDebuggerInfo *info, JSValue value) {
@@ -57,7 +86,9 @@ static int js_transport_write_value(JSDebuggerInfo *info, JSValue value) {
     const char* str = JS_ToCStringLen(info->ctx, &len, stringified);
     int ret = 0;
     if (len)
+    {
         ret = js_transport_write_message_newline(info, str, len);
+    }
     // else send error somewhere?
     JS_FreeCString(info->ctx, str);
     JS_FreeValue(info->ctx, stringified);
@@ -88,7 +119,7 @@ static int js_transport_send_response(JSDebuggerInfo *info, JSValue request, JSV
 static int js_transport_send_files(JSDebuggerInfo *info) {
     JSDebuggerJSFileInfo *item = g_js_file_list;
     if (info->file_send_ver > 0 && item->version <= info->file_send_ver)
-        return;
+        return 0;
     
     const char *name = "files";
     if (info->file_send_ver != 0)
@@ -107,7 +138,7 @@ static int js_transport_send_files(JSDebuggerInfo *info) {
                 max_version = item->version;
 
             JS_SetPropertyStr(ctx, files, item->filename, JS_NewString(ctx, item->content));
-            printf("files:%d.[%s]", index, item->filename);
+            printf("js_transport_send_files | files:%d.[%s]\n", index, item->filename);
             ++index;
             item = item ->next;
         }
@@ -574,25 +605,24 @@ void js_debugger_free_context(JSContext *ctx) {
 // in thread check request/response of pending commands.
 // todo: background thread that reads the socket.
 void js_debugger_check(JSContext* ctx, const uint8_t *cur_pc) {
-    JSDebuggerInfo *info = js_debugger_info(JS_GetRuntime(ctx));
+    JSRuntime *rt = JS_GetRuntime(ctx);
+    JSDebuggerInfo *info = js_debugger_info(rt);
     if (info->is_debugging)
+    {
+        printf("info->is_debugging=%d\n", info->is_debugging);
         return;
+    }
     if (info->debugging_ctx == ctx)
+    {
+        printf("info->debugging_ctx == ctx\n");
         return;
+    }
     info->is_debugging = 1;
     info->ctx = ctx;
 
-    if (!info->attempted_connect) {
-        info->attempted_connect = 1;
-        char *address = getenv("QUICKJS_DEBUG_ADDRESS");
-        if (address != NULL && !info->transport_close)
-            js_debugger_connect(ctx, address);
-    }
-    else if (!info->attempted_wait) {
-        info->attempted_wait = 1;
-        char *address = getenv("QUICKJS_DEBUG_LISTEN_ADDRESS");
-        if (address != NULL && !info->transport_close)
-            js_debugger_wait_connection(ctx, address);
+    if (info->transport_close == NULL && strlen(js_wait_addr(rt)) > 0)
+    {
+        js_debugger_wait_connection(ctx, js_wait_addr(rt));
     }
 
     if (info->transport_close == NULL)
@@ -682,11 +712,10 @@ void js_debugger_check(JSContext* ctx, const uint8_t *cur_pc) {
     // and read it without blocking until all data is consumed.
     if (!info->is_paused) {
         // only peek at the stream every now and then.
-        if (info->peek_ticks++ < 10000 && !info->should_peek)
-            goto done;
+        // if (!info->should_peek)
+        //     goto done;
 
-        info->peek_ticks = 0;
-        info->should_peek = 0;
+        // info->should_peek = 0;
 
         // continue peek/reading until there's nothing left.
         // breakpoints may arrive outside of a debugger pause.
@@ -706,7 +735,7 @@ void js_debugger_check(JSContext* ctx, const uint8_t *cur_pc) {
         goto done;
 
     fail: 
-        js_debugger_free(JS_GetRuntime(ctx), info);
+        js_debugger_free(JS_GetRuntime(ctx), info, 1);
     done:
         info->is_debugging = 0;
         info->ctx = NULL;
@@ -744,20 +773,25 @@ void js_debugger_add_new_file(JSContext *ctx, const char *filename, const char *
     }
 }
 
-void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info) {
+void js_debugger_free(JSRuntime *rt, JSDebuggerInfo *info, int send_close_msg) {
     if (!info->transport_close)
         return;
 
-    // don't use the JSContext because it might be in a funky state during teardown.
-    const char* terminated = "{\"type\":\"event\",\"event\":{\"type\":\"terminated\"}}";
-    js_transport_write_message_newline(info, terminated, strlen(terminated));
+    if (send_close_msg > 0)
+    {
+        // don't use the JSContext because it might be in a funky state during teardown.
+        const char* terminated = "{\"type\":\"event\",\"event\":{\"type\":\"terminated\"}}";
+        js_transport_write_message_newline(info, terminated, strlen(terminated));
+    }
 
     info->transport_close(rt, info->transport_udata);
-
+    info->transport_udata = NULL;
+    
     info->transport_read = NULL;
     info->transport_write = NULL;
     info->transport_peek = NULL;
     info->transport_close = NULL;
+    printf("info->transport_close = NULL;\n");
 
     if (info->message_buffer) {
         js_free_rt(rt, info->message_buffer);
@@ -781,7 +815,7 @@ void js_debugger_attach(
 ) {
     JSRuntime *rt = JS_GetRuntime(ctx);
     JSDebuggerInfo *info = js_debugger_info(rt);
-    js_debugger_free(rt, info);
+    js_debugger_free(rt, info, 1);
 
     info->debugging_ctx = JS_NewContext(rt);
     info->transport_read = transport_read;
@@ -806,7 +840,10 @@ void js_debugger_attach(
 }
 
 int js_debugger_is_transport_connected(JSRuntime *rt) {
-    return js_debugger_info(rt)->transport_close != NULL;
+    JSDebuggerInfo *info = js_debugger_info(rt);
+    if (info->transport_close == NULL || info->transport_udata == NULL)
+        return 0;
+    return 1;
 }
 
 void js_debugger_cooperate(JSContext *ctx) {

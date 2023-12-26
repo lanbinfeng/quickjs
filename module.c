@@ -748,13 +748,13 @@ static PyObject *runtime_add_callable(RuntimeData *self, PyObject *args) {
 }
 
 static PyObject *runtime_debugger_wait(RuntimeData *self, PyObject *args) {
-	const char *addr;
-	if (!PyArg_ParseTuple(args, "s", &addr)) {
+	const char *address;
+	if (!PyArg_ParseTuple(args, "s", &address)) {
 		return NULL;
 	}
-
-	JSContext *context = self->context;
-	js_debugger_wait_connection(context, addr);
+	JSRuntime *rt = JS_GetRuntime(self->context);
+	js_set_wait_addr(rt, address);
+	js_debugger_wait_connection(self->context, js_wait_addr(rt));
 	Py_RETURN_NONE;
 }
 
@@ -793,7 +793,7 @@ static PyMethodDef runtime_methods[] = {
     {"memory", (PyCFunction)runtime_memory, METH_NOARGS, "Returns the memory usage as a dict."},
     {"gc", (PyCFunction)runtime_gc, METH_NOARGS, "Runs garbage collection."},
     {"add_callable", (PyCFunction)runtime_add_callable, METH_VARARGS, "Wraps a Python callable."},
-    {"debugger_wait", (PyCFunction)runtime_debugger_wait, METH_VARARGS, "wait debugger."},
+    {"debugger_wait", (PyCFunction)runtime_debugger_wait, METH_VARARGS, "Wraps a Python callable."},
     {NULL} /* Sentinel */
 };
 
